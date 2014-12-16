@@ -16,7 +16,7 @@
 #include "pkix.h"
 /*#include "pkix_sample_modules.h" */
 #include "pkix_pl_cert.h"
-
+#include "moz_pkix.h"
 
 #include "nsspki.h"
 #include "pkitm.h"
@@ -695,6 +695,10 @@ cert_VerifyCertChain(CERTCertDBHandle *handle, CERTCertificate *cert,
                      SECCertUsage certUsage, PRTime t, void *wincx,
                      CERTVerifyLog *log, PRBool* revoked)
 {
+    if (1==1) {
+        return MOZ_PKIX_VerifyCertChain();
+
+    }
     if (CERT_GetUsePKIXForValidation()) {
         return cert_VerifyCertChainPkix(cert, checkSig, certUsage, t,
                                         wincx, log, sigerror, revoked);

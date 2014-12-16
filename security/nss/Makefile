@@ -44,9 +44,9 @@ include $(CORE_DEPTH)/coreconf/rules.mk
 # (7) Execute "local" rules. (OPTIONAL).                              #
 #######################################################################
 
-nss_build_all: build_nspr all
+nss_build_all: build_nspr build_mozpkix all
 
-nss_clean_all: clobber_nspr clobber
+nss_clean_all: clobber_nspr clobber_mozpkix clobber
 
 NSPR_CONFIG_STATUS = $(CORE_DEPTH)/../nspr/$(OBJDIR_NAME)/config.status
 NSPR_CONFIGURE = $(CORE_DEPTH)/../nspr/configure
@@ -108,6 +108,12 @@ $(NSPR_CONFIG_STATUS): $(NSPR_CONFIGURE)
 	$(NSPR_CONFIGURE_OPTS) \
 	--with-dist-prefix='$(NSPR_PREFIX)' \
 	--with-dist-includedir='$(NSPR_PREFIX)/include'
+
+build_mozpkix: build_nspr
+	$(MAKE) -C $(CORE_DEPTH)/../mozpkix
+
+clobber_mozpkix:
+	$(MAKE) -C $(CORE_DEPTH)/../mozpkix clobber
 
 build_nspr: $(NSPR_CONFIG_STATUS)
 	$(MAKE) -C $(CORE_DEPTH)/../nspr/$(OBJDIR_NAME)

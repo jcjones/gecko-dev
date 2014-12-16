@@ -143,6 +143,7 @@ EXTRA_SHARED_LIBS += \
 	-lplc4 \
 	-lplds4 \
 	-lnspr4 \
+	-lmozpkixnss \
 	$(NULL)
 endif
 
@@ -191,6 +192,7 @@ EXTRA_SHARED_LIBS += \
 	-lplc4 \
 	-lplds4 \
 	-lnspr4 \
+	-lmozpkixnss \
 	$(NULL)
 endif
 

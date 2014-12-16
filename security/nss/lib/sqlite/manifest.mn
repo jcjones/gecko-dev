@@ -6,10 +6,12 @@ CORE_DEPTH = ../..
 
 MODULE = nss
 
+ifndef SQLITE_USE_SYSTEM
 LIBRARY_NAME = sqlite
 LIBRARY_VERSION = 3
 MAPFILE = $(OBJDIR)/sqlite.def
 DEFINES += -DSQLITE_THREADSAFE=1
+endif
 
 EXPORTS = \
 	$(NULL)
@@ -18,11 +20,9 @@ PRIVATE_EXPORTS = \
 	sqlite3.h \
 	$(NULL)
 
-
 CSRCS = \
 	sqlite3.c \
 	$(NULL)
-
 
 
 # only add module debugging in opt builds if DEBUG_PKCS11 is set

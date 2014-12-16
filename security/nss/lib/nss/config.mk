@@ -21,7 +21,8 @@ EXTRA_SHARED_LIBS += \
 	-L$(NSPR_LIB_DIR) \
 	-lplc4 \
 	-lplds4 \
-	-lnspr4\
+	-lnspr4 \
+	-lmozpkixnss \
 	$(NULL)
 else # ! NS_USE_GCC
 EXTRA_SHARED_LIBS += \
@@ -44,6 +45,7 @@ EXTRA_SHARED_LIBS += \
 	-lplc4 \
 	-lplds4 \
 	-lnspr4 \
+	-lmozpkixnss \
 	$(NULL)
 
 endif
