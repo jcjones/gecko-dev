@@ -22,7 +22,7 @@
  * limitations under the License.
  */
 
-#include "pkix/Time.h"
+#include "pkix/pkixtime.h"
 #include "pkixutil.h"
 #ifdef WIN32
 #include "windows.h"

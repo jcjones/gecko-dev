@@ -26,7 +26,7 @@
 #define mozilla_pkix__pkixtypes_h
 
 #include "pkix/Input.h"
-#include "pkix/Time.h"
+#include "pkix/pkixtime.h"
 #include "stdint.h"
 
 namespace mozilla { namespace pkix {

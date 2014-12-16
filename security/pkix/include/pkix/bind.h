@@ -56,6 +56,7 @@ using std::ref;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
+using std::placeholders::_4;
 
 #else
 

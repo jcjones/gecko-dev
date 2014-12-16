@@ -1,0 +1,40 @@
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+CORE_DEPTH = .
+DEPTH      = .
+MODULE = pkix
+
+EXPORTS = \
+      include/pkix/Input.h \
+      include/pkix/Result.h \
+      include/pkix/ScopedPtr.h \
+      include/pkix/bind.h \
+      include/pkix/enumclass.h \
+      include/pkix/nullptr.h \
+      include/pkix/pkixtime.h \
+      include/pkix/pkix.h \
+      include/pkix/pkixnss.h \
+      include/pkix/pkixtypes.h
+
+CPPSRCS = \
+      lib/pkixbind.cpp \
+      lib/pkixbuild.cpp \
+      lib/pkixcert.cpp \
+      lib/pkixcheck.cpp \
+      lib/pkixder.cpp \
+      lib/pkixnames.cpp \
+      lib/pkixocsp.cpp \
+      lib/pkixresult.cpp \
+      lib/pkixtime.cpp
+
+ifdef MOZ_PKIX_NSS
+CPPSRCS += lib/pkixnss.cpp
+EXTRA_LIBS += $(DIST)/lib/$(LIB_PREFIX)nspr4.$(LIB_SUFFIX)
+endif
+
+INCLUDES += -I$(CORE_DEPTH)/include/
+
+LIBRARY_NAME = mozillapkix
+LIBRARY_VERSION = 1
