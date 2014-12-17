@@ -24,9 +24,14 @@ elif CONFIG['MOZ_FOLD_LIBS']:
     else:
         suffix = ''
     USE_LIBS += [
+        'mozillapkix',
         'static:/nsprpub/lib/ds/plds4%s' % suffix,
         'static:/nsprpub/lib/libc/src/plc4%s' % suffix,
         'static:/nsprpub/pr/src/nspr4%s' % suffix,
+    ]
+
+    LOCAL_INCLUDES += [
+        '/security/pkix/include',
     ]
 
     OS_LIBS += CONFIG['REALTIME_LIBS']
@@ -43,5 +48,6 @@ else:
         '/security/nss/lib/smime/smime3',
         '/security/nss/lib/ssl/ssl3',
         '/security/nss/lib/util/nssutil3',
+        'mozillapkix',
         'sqlite',
     ]

@@ -29,7 +29,7 @@
 #include "mozilla/Mutex.h"
 #include "mozilla/Vector.h"
 #include "pkix/Result.h"
-#include "pkix/Time.h"
+#include "pkix/pkixtime.h"
 #include "prerror.h"
 #include "seccomon.h"
 

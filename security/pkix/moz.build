@@ -17,6 +17,11 @@ SOURCES += [
     'lib/pkixtime.cpp',
 ]
 
+EXPORTS += [
+    'include/pkix/pkix.h',
+    'include/pkix/pkixtime.h',
+]
+
 LOCAL_INCLUDES += [
     'include',
 ]

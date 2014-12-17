@@ -8,7 +8,7 @@
 #include "CertVerifier.h"
 #include "nsNSSComponent.h"
 #include "certt.h"
-#include "pkix/Time.h"
+#include "pkix/pkixtime.h"
 
 class nsUsageArrayHelper
 {

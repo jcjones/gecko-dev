@@ -13,7 +13,7 @@ SHARED_LIBRARY_DIRS :=
 include $(topsrcdir)/security/$(1)/config.mk
 dirs += $$(addprefix $(1)/,$$(SHARED_LIBRARY_DIRS)) $(1)
 endef
-$(foreach dir,util nss ssl smime,$(eval $(call add_dirs,nss/lib/$(dir))))
+$(foreach dir,util moz_pkix_nss nss ssl smime,$(eval $(call add_dirs,nss/lib/$(dir))))
 
 libs :=
 define add_lib

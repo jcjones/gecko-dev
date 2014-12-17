@@ -8,7 +8,7 @@
 #include "cert.h"
 #include "nsString.h"
 #include "nsTArray.h"
-#include "pkix/Time.h"
+#include "pkix/pkixtime.h"
 
 namespace mozilla {
 namespace psm {
