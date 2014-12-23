@@ -695,9 +695,9 @@ cert_VerifyCertChain(CERTCertDBHandle *handle, CERTCertificate *cert,
                      SECCertUsage certUsage, PRTime t, void *wincx,
                      CERTVerifyLog *log, PRBool* revoked)
 {
-    if (1==1) {
-        return MOZ_PKIX_VerifyCertChain();
-
+    if (MOZ_PKIX_GetUseMozPKIXForValidation()) {
+        return MOZ_PKIX_VerifyCertChain(cert, checkSig, certUsage, t,
+                                        wincx, log, sigerror, revoked);
     }
     if (CERT_GetUsePKIXForValidation()) {
         return cert_VerifyCertChainPkix(cert, checkSig, certUsage, t,

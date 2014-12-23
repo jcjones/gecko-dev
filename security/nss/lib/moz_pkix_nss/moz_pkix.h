@@ -11,6 +11,8 @@
 #ifndef mozilla_pkix_nss__moz_pkix_h
 #define mozilla_pkix_nss__moz_pkix_h
 
+#import "certt.h"
+#import "prtime.h"
 #import "seccomon.h"
 
 #ifdef __cplusplus
@@ -18,8 +20,19 @@ extern "C" {
 #endif
 
 
-void MOZ_PKIX_Initialize();
-SECStatus MOZ_PKIX_VerifyCertChain();
+void
+MOZ_PKIX_Initialize();
+
+SECStatus
+MOZ_PKIX_VerifyCertChain(CERTCertificate *cert,
+                         PRBool checkSig,
+                         SECCertUsage certUsage, PRTime t, void *wincx,
+      /* out */          CERTVerifyLog *log,
+      /* optional out */ PRBool *sigerror,
+      /* optional out */ PRBool *revoked);
+
+PRBool
+MOZ_PKIX_GetUseMozPKIXForValidation();
 
 #ifdef __cplusplus
 }

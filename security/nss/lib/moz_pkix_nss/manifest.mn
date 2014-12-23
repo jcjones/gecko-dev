@@ -19,6 +19,7 @@ CPPSRCS = \
 EXTRA_SHARED_LIBS += \
 	-L$(DIST)/lib \
 	-lmozillapkix \
+	-lnspr4 \
 	$(NULL)
 
 # TODO: Refactor pkix's manifest to export headers to dist/public/pkix/pkix/...
