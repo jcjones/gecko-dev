@@ -80,6 +80,7 @@ EXTRA_LIBS += \
 	$(DIST)/lib/$(LIB_PREFIX)cryptohi.$(LIB_SUFFIX) \
 	$(DIST)/lib/$(LIB_PREFIX)pk11wrap.$(LIB_SUFFIX) \
 	$(DIST)/lib/$(LIB_PREFIX)certdb.$(LIB_SUFFIX) \
+	$(DIST)/lib/$(LIB_PREFIX)mozpkixnss.$(LIB_SUFFIX) \
 	$(SOFTOKENLIB) \
 	$(CRYPTOLIB) \
 	$(DIST)/lib/$(LIB_PREFIX)nsspki.$(LIB_SUFFIX) \
@@ -126,6 +127,7 @@ EXTRA_LIBS += \
 	$(DIST)/lib/$(LIB_PREFIX)nss.$(LIB_SUFFIX) \
 	$(DIST)/lib/$(LIB_PREFIX)pk11wrap.$(LIB_SUFFIX) \
 	$(DIST)/lib/$(LIB_PREFIX)certhi.$(LIB_SUFFIX) \
+	$(DIST)/lib/$(LIB_PREFIX)mozpkixnss.$(LIB_SUFFIX) \
 	$(NULL)
 
 ifeq ($(OS_ARCH), AIX) 
@@ -143,7 +145,7 @@ EXTRA_SHARED_LIBS += \
 	-lplc4 \
 	-lplds4 \
 	-lnspr4 \
-	-lmozpkixnss \
+	-lmozillapkix \
 	$(NULL)
 endif
 
@@ -192,7 +194,7 @@ EXTRA_SHARED_LIBS += \
 	-lplc4 \
 	-lplds4 \
 	-lnspr4 \
-	-lmozpkixnss \
+	-lmozillapkix \
 	$(NULL)
 endif
 

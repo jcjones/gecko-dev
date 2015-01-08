@@ -12,16 +12,49 @@
 #ifndef mozilla_pkix_nss__trust_domain_h
 #define mozilla_pkix_nss__trust_domain_h
 
-#import "pkix/pkix.h"
+#include "pkix/pkix.h"
 
-namespace nss { namespace pkix {
+#include "cert.h"
+#include "pkix/ScopedPtr.h"
+
+// XXX Logging
+extern PRLogModuleInfo *pkixLog;
+#define gCertVerifierLog pkixLog
+
+typedef mozilla::pkix::ScopedPtr<CERTCertificate, CERT_DestroyCertificate>
+          ScopedCERTCertificate;
+typedef mozilla::pkix::ScopedPtr<CERTCertList, CERT_DestroyCertList>
+          ScopedCERTCertList;
+
+namespace nss { namespace mozpkix {
+
+class OCSPCache {}; // XXX
+class PinningMode {}; // XXX
+class OCSPConfig {}; // XXX
+
+bool CertIsAuthoritativeForEVPolicy(const CERTCertificate* cert,
+                                    const mozilla::pkix::CertPolicyId& policy);
 
 class NSSCertDBTrustDomain : public mozilla::pkix::TrustDomain
 {
 public:
-   typedef mozilla::pkix::Result Result;
+  typedef mozilla::pkix::Result Result;
 
-   NSSCertDBTrustDomain();
+  enum OCSPFetching {
+    NeverFetchOCSP = 0,
+    FetchOCSPForDVSoftFail = 1,
+    FetchOCSPForDVHardFail = 2,
+    FetchOCSPForEV = 3,
+    LocalOnlyOCSPForEV = 4,
+  };
+
+  NSSCertDBTrustDomain(SECTrustType certDBTrustType, OCSPFetching ocspFetching,
+                       OCSPCache& ocspCache, void* pinArg,
+                       OCSPConfig ocspConfig,
+                       PinningMode pinningMode,
+                       bool forEV,
+          /*optional*/ const char* hostname = nullptr,
+      /*optional out*/ ScopedCERTCertList* builtChain = nullptr);
 
    virtual Result GetCertTrust(mozilla::pkix::EndEntityOrCA endEntityOrCA,
                                const mozilla::pkix::CertPolicyId& policy,
@@ -55,9 +88,28 @@ public:
    virtual Result DigestBuf(mozilla::pkix::Input item,
                             /*out*/ uint8_t* digestBuf,
                             size_t digestBufLen) override;
+private:
+  enum EncodedResponseSource {
+    ResponseIsFromNetwork = 1,
+    ResponseWasStapled = 2
+  };
+  Result VerifyAndMaybeCacheEncodedOCSPResponse(
+    const mozilla::pkix::CertID& certID, mozilla::pkix::Time time,
+    uint16_t maxLifetimeInDays, mozilla::pkix::Input encodedResponse,
+    EncodedResponseSource responseSource, /*out*/ bool& expired);
+
+  const SECTrustType mCertDBTrustType;
+  const OCSPFetching mOCSPFetching;
+  OCSPCache& mOCSPCache; // non-owning!
+  void* mPinArg; // non-owning!
+  const OCSPConfig mOCSPConfig;
+  PinningMode mPinningMode;
+  const unsigned int mMinimumNonECCBits;
+  const char* mHostname; // non-owning - only used for pinning checks
+  ScopedCERTCertList* mBuiltChain; // non-owning
 };
 
 
-} } // namespace nss::pkix
+} } // namespace nss::mozpkix
 
 #endif // mozilla_pkix_nss__trust_domain_h

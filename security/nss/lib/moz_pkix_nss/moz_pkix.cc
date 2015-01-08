@@ -8,14 +8,13 @@
  *
  */
 
-#import "moz_pkix.h"
+#include "moz_pkix.h"
 
-#import "pkit.h"
-#import "pkix/pkix.h"
-#import "trust_domain.h"
+#include "pkit.h"
+#include "pkix/pkix.h"
+#include "trust_domain.h"
 
 void MOZ_PKIX_Initialize() {
-  nss::pkix::NSSCertDBTrustDomain trustDomain;
 }
 
 PRBool
@@ -33,7 +32,16 @@ MOZ_PKIX_VerifyCertChain(CERTCertificate *cert,
 
   PR_ASSERT(cert);
 
-  nss::pkix::NSSCertDBTrustDomain trustDomain;
+  nss::mozpkix::OCSPCache ocspCache;
+  nss::mozpkix::PinningMode pinningMode;
+  nss::mozpkix::OCSPConfig ocspConfig;
+
+  nss::mozpkix::NSSCertDBTrustDomain trustDomain(trustSSL,
+    nss::mozpkix::NSSCertDBTrustDomain::FetchOCSPForEV,
+    ocspCache, nullptr, ocspConfig, pinningMode, false,
+    /* XXX hostname   */ nullptr,
+    /* XXX builtChain */ nullptr);
+
   mozilla::pkix::Result rv;
 
   if (revoked)
@@ -59,9 +67,10 @@ MOZ_PKIX_VerifyCertChain(CERTCertificate *cert,
         mozilla::pkix::KeyUsage::noParticularKeyUsageRequired,
         mozilla::pkix::KeyPurposeId::anyExtendedKeyUsage,
         mozilla::pkix::CertPolicyId::anyPolicy,
-        nullptr
+        /* XXX stapled OCSP response */ nullptr
         );
 
+  /* XXX TODO Remove debug print */
   printf("rv= %d %s", rv, mozilla::pkix::MapResultToName(rv));
 
   switch(rv) {
@@ -73,6 +82,8 @@ MOZ_PKIX_VerifyCertChain(CERTCertificate *cert,
       if (sigerror)
         *sigerror = PR_TRUE;
       break;
+    default:
+      break; // Nothing to do.
   }
 
   /* TODO: Append to the CERTVerifyLog. */

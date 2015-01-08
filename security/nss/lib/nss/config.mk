@@ -22,7 +22,7 @@ EXTRA_SHARED_LIBS += \
 	-lplc4 \
 	-lplds4 \
 	-lnspr4 \
-	-lmozpkixnss \
+	-lmozillapkix \
 	$(NULL)
 else # ! NS_USE_GCC
 EXTRA_SHARED_LIBS += \
@@ -45,7 +45,7 @@ EXTRA_SHARED_LIBS += \
 	-lplc4 \
 	-lplds4 \
 	-lnspr4 \
-	-lmozpkixnss \
+	-lmozillapkix \
 	$(NULL)
 
 endif
@@ -71,6 +71,7 @@ SHARED_LIBRARY_LIBS = \
 	$(DIST)/lib/$(LIB_PREFIX)pki.$(LIB_SUFFIX) \
 	$(DIST)/lib/$(LIB_PREFIX)system.$(LIB_SUFFIX) \
 	$(DIST)/lib/$(LIB_PREFIX)module.$(LIB_SUFFIX) \
+	$(DIST)/lib/$(LIB_PREFIX)mozpkixnss.$(LIB_SUFFIX) \
 	$(NULL)
 
 SHARED_LIBRARY_DIRS = \
@@ -92,7 +93,10 @@ SHARED_LIBRARY_DIRS = \
 	../libpkix/pkix_pl_nss/pki \
 	../libpkix/pkix_pl_nss/system \
 	../libpkix/pkix_pl_nss/module \
+	../moz_pkix_nss \
 	$(NULL)
+
+DEFINES += -DMOZILLA_PKIX_USE_REAL_FUNCTIONAL
 
 ifeq (,$(filter-out WINNT WIN95,$(OS_TARGET)))
 ifndef NS_USE_GCC

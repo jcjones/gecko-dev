@@ -19,6 +19,7 @@ endif
 CC			= gcc
 CCC			= g++
 RANLIB			= ranlib
+MKPROG			= $(CCC)
 
 DEFAULT_COMPILER = gcc
 
@@ -102,7 +103,7 @@ endif
 
 ifeq ($(OS_RELEASE),2.0)
 	OS_REL_CFLAGS	+= -DLINUX2_0
-	MKSHLIB		= $(CC) -shared -Wl,-soname -Wl,$(@:$(OBJDIR)/%.so=%.so) $(RPATH)
+	MKSHLIB		= $(CCC) -shared -Wl,-soname -Wl,$(@:$(OBJDIR)/%.so=%.so) $(RPATH)
 	ifdef MAPFILE
 		MKSHLIB += -Wl,--version-script,$(MAPFILE)
 	endif
@@ -190,7 +191,7 @@ endif
 endif
 
 OS_REL_CFLAGS   += -DLINUX2_1
-MKSHLIB         = $(CC) $(DSO_LDOPTS) -Wl,-soname -Wl,$(@:$(OBJDIR)/%.so=%.so) $(RPATH)
+MKSHLIB         = $(CCC) $(DSO_LDOPTS) -Wl,-soname -Wl,$(@:$(OBJDIR)/%.so=%.so) $(RPATH)
 
 ifdef MAPFILE
 	MKSHLIB += -Wl,--version-script,$(MAPFILE)

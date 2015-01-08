@@ -11,9 +11,9 @@
 #ifndef mozilla_pkix_nss__moz_pkix_h
 #define mozilla_pkix_nss__moz_pkix_h
 
-#import "certt.h"
-#import "prtime.h"
-#import "seccomon.h"
+#include "certt.h"
+#include "prtime.h"
+#include "seccomon.h"
 
 #ifdef __cplusplus
 extern "C" {

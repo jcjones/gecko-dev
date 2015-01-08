@@ -188,3 +188,6 @@ DEFINES += -DNO_NSPR_10_SUPPORT
 
 # Hide old, deprecated, TLS cipher suite names when building NSS
 DEFINES += -DSSL_DISABLE_DEPRECATED_CIPHER_SUITE_NAMES
+
+# Build Mozilla PKIX using C++11 functional library
+DEFINES += -DMOZILLA_PKIX_USE_REAL_FUNCTIONAL
