@@ -28,6 +28,12 @@ CryptoBuffer::Assign(const uint8_t* aData, uint32_t aLength)
 }
 
 uint8_t*
+CryptoBuffer::Assign(const nsACString& aString)
+{
+  return Assign((uint8_t*) aString.BeginReading(), aString.Length());
+}
+
+uint8_t*
 CryptoBuffer::Assign(const SECItem* aItem)
 {
   MOZ_ASSERT(aItem);
