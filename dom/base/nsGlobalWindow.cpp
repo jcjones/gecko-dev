@@ -4359,6 +4359,11 @@ nsGlobalWindow::GetU2f(ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsInnerWindow());
 
+  if (!Preferences::GetBool("security.webauth.u2f", true)) {
+    aError.Throw(NS_ERROR_NOT_AVAILABLE);
+    return nullptr;
+  }
+
   if (!mU2F) {
     mU2F = new U2F();
     mU2F->Init(this);

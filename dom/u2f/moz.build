@@ -21,4 +21,4 @@ LOCAL_INCLUDES += [
     '/security/manager/ssl',
 ]
 
-#MOCHITEST_MANIFESTS += ['test/mochitest.ini']
+MOCHITEST_MANIFESTS += ['tests/mochitest.ini']

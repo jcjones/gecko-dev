@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<meta charset=utf-8>
+<head>
+  <title>Test for FIDO Universal Second Factor</title>
+  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
+  <script src="u2futil.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body>
+<a target="_blank" href="https://bugzilla.mozilla.org/show_bug.cgi?id=1231681">Mozilla Bug 1231681</a>
+<p id="display"></p>
+<div id="content" style="display: none">
+</div>
+<pre id="test">
+<script class="testbody" type="text/javascript">
+SimpleTest.waitForExplicitFinish();
+SpecialPowers.setBoolPref("security.webauth.u2f", true);
+SpecialPowers.setBoolPref("security.webauth.u2f.softtoken", true);
+
+isnot(window.u2f, undefined, "U2F API endpoint must exist")
+isnot(window.u2f.register, undefined, "U2F Register API endpoint must exist")
+isnot(window.u2f.sign, undefined, "U2F Sign API endpoint must exist")
+
+SpecialPowers.setBoolPref("security.webauth.u2f", false);
+
+SimpleTest.doesThrow(function(){
+    var U2f = window.u2f;
+  },
+  "Test disabling U2F"
+);
+
+SpecialPowers.setBoolPref("security.webauth.u2f", true);
+
+var state = {
+  // Raw messages
+  regRequest: null,
+  regResponse: null,
+  signRequest: null,
+  signResponse: null,
+
+  // Parsed values
+  publicKey: null,
+  keyHandle: null,
+
+  // Constants
+  version: "U2F_V2",
+  appId: window.location.origin,
+};
+
+testRegistering();
+
+function testRegistering() {
+  var challenge = new Uint8Array(16);
+  window.crypto.getRandomValues(challenge);
+
+  state.regRequest = {
+    version: state.version,
+    challenge: bytesToBase64UrlSafe(challenge),
+    appId: state.appId,
+  };
+
+  u2f.register([state.regRequest], [], registerCb);
+}
+
+function registerCb(regResponse) {
+  state.regResponse = regResponse;
+
+  // Parse the response data from the U2F token
+  var registrationData = base64ToBytesUrlSafe(regResponse.registrationData);
+  is(registrationData[0], 0x05, "Reserved byte is correct")
+
+  state.publicKeyBytes = registrationData.slice(1, 66);
+  var keyHandleLength = registrationData[66];
+  state.keyHandle = bytesToBase64UrlSafe(registrationData.slice(67, 67+keyHandleLength));
+  state.attestation = registrationData.slice(67+keyHandleLength);
+
+  // Verify that the clientData from the U2F token makes sense
+  var clientDataJSON = "";
+  base64ToBytesUrlSafe(regResponse.clientData).map(x => clientDataJSON += String.fromCharCode(x));
+  var clientData = JSON.parse(clientDataJSON);
+  is(clientData.typ, "navigator.id.finishEnrollment", "Data type matches");
+  is(clientData.challenge, state.regRequest.challenge, "Challenge matches");
+  is(clientData.origin, window.location.origin, "Origins are the same");
+
+  // Import the public key of the U2F token into WebCrypto
+  importPublicKey(state.publicKeyBytes)
+  .then(function(key) {
+    state.publicKey = key;
+    ok(true, "Imported public key")
+
+    testSigning()
+  })
+  .catch(function(err) {
+    console.log(err);
+    ok(false, "Imported public key")
+    SimpleTest.finish();
+  });
+};
+
+function testSigning() {
+  var challenge = new Uint8Array(16);
+  window.crypto.getRandomValues(challenge);
+
+  state.signRequest = {
+    version: state.version,
+    challenge: bytesToBase64UrlSafe(challenge),
+    keyHandle: state.keyHandle,
+    appId: state.appId,
+  };
+
+  u2f.sign([state.signRequest], signCb);
+}
+
+function signCb(signResponse) {
+  state.signResponse = signResponse;
+
+  is(signResponse.errorCode, 0, "The signing did not error")
+
+  // Verify that the clientData makes sense
+  var clientDataJSON = "";
+  base64ToBytesUrlSafe(signResponse.clientData).map(x => clientDataJSON += String.fromCharCode(x));
+  var clientData = JSON.parse(clientDataJSON);
+  is(clientData.typ, "navigator.id.getAssertion", "Data type matches");
+  is(clientData.challenge, state.signRequest.challenge, "Challenge matches");
+  is(clientData.origin, window.location.origin, "Origins are the same");
+
+  // Parse the signature data
+  var signatureData = base64ToBytesUrlSafe(signResponse.signatureData);
+  if (signatureData[0] != 0x01) {
+    throw "User presence byte not set";
+  }
+  var presenceAndCounter = signatureData.slice(0,5);
+  var signatureValue = signatureData.slice(5);
+
+  // Assemble the signed data and verify the signature
+  assembleSignedData(state.appId, presenceAndCounter, string2buffer(clientDataJSON))
+  .then(function(signedData) {
+    return verifySignature(state.publicKey, signedData, signatureValue);
+  })
+  .then(function(verified) {
+    console.log("No error verifying signature");
+    ok(verified, "Signature verified")
+
+    SimpleTest.finish();
+  })
+  .catch(function(err) {
+    console.log(err);
+    ok(false, "Signature invalid")
+
+    SimpleTest.finish();
+  });
+};
+
+</script>
+</pre>
+</body>
+</html>

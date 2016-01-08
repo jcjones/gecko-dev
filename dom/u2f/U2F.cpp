@@ -7,6 +7,7 @@
 #include "mozilla/dom/U2F.h"
 #include "mozilla/dom/U2FBinding.h"
 #include "mozilla/dom/CryptoBuffer.h"
+#include "mozilla/Preferences.h"
 #include "pk11pub.h"
 
 namespace mozilla {
@@ -51,17 +52,20 @@ U2F::Init(nsPIDOMWindow* aParent) {
   mParent = do_QueryInterface(aParent);
   MOZ_ASSERT(mParent);
 
+  nsCOMPtr<nsIDocument> doc = mParent->GetDoc();
+  MOZ_ASSERT(doc);
+
   // XXX: This feels a little odd.  Can this object ever live
   //      beyond the lifetime of the document?
-  // XXX: The chain of arrows feels risky.  Check for nulls
-  //      along the way?
   nsCString origin;
-  nsresult rv = mParent->GetDoc()->NodePrincipal()->GetOrigin(origin);
+  nsresult rv = doc->NodePrincipal()->GetOrigin(origin);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
   mOrigin = NS_ConvertUTF8toUTF16(origin);
 
-  rv = mToken.Init();
-  MOZ_ASSERT(NS_SUCCEEDED(rv));
+  if (!Preferences::GetBool("security.webauth.u2f.softoken", false)) {
+    rv = mToken.Init();
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
+  }
 }
 
 nsresult
@@ -94,28 +98,29 @@ U2F::ValidAppID(const nsString& aAppId)
   return true;
 }
 
-// TODO: Enable sending of error messages
-// XXX: Template?
+
+template <class CB, class Rsp>
 void
-RegisterError(U2FRegisterCallback& aCallback,
-              ErrorCode aErrorCode)
+SendError(CB& aCallback,
+              ErrorCode aErrorCode, nsString aErrorMessage)
 {
   ErrorResult result;
-  RegisterResponse response;
+  Rsp response;
   response.mErrorCode.Construct((uint32_t) aErrorCode);
+  response.mErrorMessage.Construct(aErrorMessage);
   aCallback.Call(response, result);
 }
 
-void
-SignError(U2FSignCallback& aCallback,
-          ErrorCode aErrorCode)
-{
-  ErrorResult result;
-  SignResponse response;
-  response.mErrorCode.Construct((uint32_t) aErrorCode);
-  aCallback.Call(response, result);
-}
-
+// XXX I18N
+const nsString ERR_NO_VERSION = NS_LITERAL_STRING("No requests had the correct version");
+const nsString ERR_NO_APP_ID = NS_LITERAL_STRING("No valid App ID found");
+const nsString ERR_ASSEMBLE = NS_LITERAL_STRING("Could not assemble client data");
+const nsString ERR_REGISTER = NS_LITERAL_STRING("Register failed");
+const nsString ERR_SERIALIZE = NS_LITERAL_STRING("Could not serialize output");
+const nsString ERR_DESERIALIZE = NS_LITERAL_STRING("Could not deserialize input");
+const nsString ERR_SIGN = NS_LITERAL_STRING("Could not sign");
+const nsString ERR_MEMORY = NS_LITERAL_STRING("Could not allocate memory");
+const nsString ERR_HASH = NS_LITERAL_STRING("Could not perform digest function");
 
 void
 U2F::Register(const Sequence<RegisterRequest>& registerRequests,
@@ -137,14 +142,14 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
     }
   }
   if (i >= registerRequests.Length()) {
-    RegisterError(callback, ErrorCode::BAD_REQUEST);
+    SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::BAD_REQUEST, ERR_NO_VERSION);
     return;
   }
   RegisterRequest request(registerRequests[i]);
 
   // Verify the asserted appId
   if (!ValidAppID(request.mAppId.Value())) {
-    RegisterError(callback, ErrorCode::BAD_REQUEST);
+    SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::BAD_REQUEST, ERR_NO_APP_ID);
     return;
   }
 
@@ -155,7 +160,7 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
                                    request.mChallenge.Value(),
                                    clientData);
   if (NS_FAILED(rv)) {
-    RegisterError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_ASSEMBLE);
     return;
   }
 
@@ -165,7 +170,7 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
   CryptoBuffer registrationData;
   rv = mToken.Register(bogus, bogus, registrationData);
   if (NS_FAILED(rv)) {
-    RegisterError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_REGISTER);
     return;
   }
 
@@ -173,9 +178,10 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
   nsString clientDataBase64, registrationDataBase64;
   if (NS_FAILED(clientData.ToJwkBase64(clientDataBase64)) ||
       NS_FAILED(registrationData.ToJwkBase64(registrationDataBase64))) {
-    RegisterError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_SERIALIZE);
     return;
   }
+
   RegisterResponse response;
   response.mClientData.Construct(clientDataBase64);
   response.mRegistrationData.Construct(registrationDataBase64);
@@ -205,14 +211,14 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
     }
   }
   if (i >= signRequests.Length()) {
-    SignError(callback, ErrorCode::BAD_REQUEST);
+    SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::BAD_REQUEST, ERR_NO_VERSION);
     return;
   }
   SignRequest request(signRequests[i]);
 
   // Verify the asserted appId
   if (!ValidAppID(request.mAppId.Value())) {
-    SignError(callback, ErrorCode::BAD_REQUEST);
+    SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::BAD_REQUEST, ERR_NO_APP_ID);
     return;
   }
 
@@ -222,7 +228,7 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
                                    request.mChallenge.Value(),
                                    clientData);
   if (NS_FAILED(rv)) {
-    SignError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_ASSEMBLE);
     return;
   }
 
@@ -233,21 +239,21 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
   CryptoBuffer appParam, challengeParam;
   if (!appParam.SetLength(32, fallible) ||
       !challengeParam.SetLength(32, fallible)) {
-    SignError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_MEMORY);
     return;
   }
 
   srv = PK11_HashBuf(SEC_OID_SHA256, appParam.Elements(),
                      (uint8_t*) appId.BeginReading(), appId.Length());
   if (srv != SECSuccess) {
-    SignError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_HASH);
     return;
   }
 
   srv = PK11_HashBuf(SEC_OID_SHA256, challengeParam.Elements(),
                      clientData.Elements(), clientData.Length());
   if (srv != SECSuccess) {
-    SignError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_HASH);
     return;
   }
 
@@ -255,7 +261,7 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
   CryptoBuffer keyHandle;
   rv = keyHandle.FromJwkBase64(request.mKeyHandle.Value());
   if (NS_FAILED(rv)) {
-    SignError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_DESERIALIZE);
     return;
   }
 
@@ -263,7 +269,7 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
   CryptoBuffer signatureData;
   rv = mToken.Sign(appParam, challengeParam, keyHandle, signatureData);
   if (NS_FAILED(rv)) {
-    SignError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_SIGN);
     return;
   }
 
@@ -271,7 +277,7 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
   nsString clientDataBase64, signatureDataBase64;
   if (NS_FAILED(clientData.ToJwkBase64(clientDataBase64)) ||
       NS_FAILED(signatureData.ToJwkBase64(signatureDataBase64))) {
-    SignError(callback, ErrorCode::OTHER_ERROR);
+    SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_SERIALIZE);
     return;
   }
   SignResponse response;

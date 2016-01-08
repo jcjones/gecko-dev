@@ -24,7 +24,12 @@ NSSToken::NSSToken()
 {}
 
 NSSToken::~NSSToken()
-{}
+{
+  if (isAlreadyShutDown()) {
+    return;
+  }
+  shutdown(calledFromObject);
+}
 
 nsresult
 NSSToken::Init()
@@ -136,6 +141,11 @@ NSSToken::Register(const CryptoBuffer& /* aChallengeParam */,
                    const CryptoBuffer& /* aApplicationParam */,
                    CryptoBuffer& aRegistrationData) const
 {
+  nsNSSShutDownPreventionLock locker;
+  if (isAlreadyShutDown()) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
   if (!mInitialized) {
     return NS_ERROR_NOT_INITIALIZED;
   }
@@ -202,6 +212,11 @@ NSSToken::Sign(const CryptoBuffer& aApplicationParam,
                const CryptoBuffer& aKeyHandle,
                CryptoBuffer& aSignatureData)
 {
+  nsNSSShutDownPreventionLock locker;
+  if (isAlreadyShutDown()) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
   if (!mInitialized) {
     return NS_ERROR_NOT_INITIALIZED;
   }

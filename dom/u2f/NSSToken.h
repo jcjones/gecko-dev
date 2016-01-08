@@ -9,6 +9,7 @@
 
 #include "mozilla/dom/CryptoBuffer.h"
 #include "ScopedNSSTypes.h"
+#include "nsNSSShutDown.h"
 
 namespace mozilla {
 namespace dom {
@@ -17,7 +18,7 @@ namespace dom {
 //
 // NOTE: Using this token is NOT SECURE.  Key handles are simply a direct
 // encoding of the private key, so they can be used to forge signatures.
-class NSSToken
+class NSSToken : public nsNSSShutDownObject
 {
 public:
   NSSToken();
@@ -35,6 +36,9 @@ public:
                 const CryptoBuffer& aChallengeParam,
                 const CryptoBuffer& aKeyHandle,
                 CryptoBuffer& aSignatureData);
+
+  // No NSS resources to release.
+  virtual void virtualDestroyNSSReference() override {};
 
 private:
   bool mInitialized;
