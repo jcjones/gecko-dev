@@ -4,48 +4,37 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef mozilla_dom_NSSToken_h
-#define mozilla_dom_NSSToken_h
+#ifndef mozilla_dom_USBToken_h
+#define mozilla_dom_USBToken_h
 
 #include "mozilla/dom/CryptoBuffer.h"
-#include "nsNSSShutDown.h"
-#include "ScopedNSSTypes.h"
 
 namespace mozilla {
 namespace dom {
 
-// NSSToken implements FIDO operations using NSS for the crypto layer.
-//
-// NOTE: Using this token is NOT SECURE.  Key handles are simply a direct
-// encoding of the private key, so they can be used to forge signatures.
-class NSSToken final : public nsNSSShutDownObject
+// USBToken implements FIDO operations using a USB device.
+class USBToken final
 {
 public:
-  NSSToken();
+  USBToken();
 
-  ~NSSToken() ;
+  ~USBToken();
 
-  nsresult Init() ;
+  nsresult Init();
 
-  const nsString& Version() const ;
+  const nsString& Version() const;
 
   nsresult Register(const CryptoBuffer& aApplicationParam,
                     const CryptoBuffer& aChallengeParam,
-                    CryptoBuffer& aRegistrationData) const ;
+                    CryptoBuffer& aRegistrationData) const;
 
   nsresult Sign(const CryptoBuffer& aApplicationParam,
                 const CryptoBuffer& aChallengeParam,
                 const CryptoBuffer& aKeyHandle,
-                CryptoBuffer& aSignatureData) ;
-
-  // No NSS resources to release.
-  virtual
-  void virtualDestroyNSSReference() override {};
+                CryptoBuffer& aSignatureData);
 
 private:
   bool mInitialized;
-  uint32_t mCounter;
-  ScopedPK11SlotInfo mSlot;
 
   static const nsString mVersion;
 };
@@ -53,4 +42,4 @@ private:
 } // namespace dom
 } // namespace mozilla
 
-#endif // mozilla_dom_NSSToken_h
+#endif // mozilla_dom_USBToken_h

@@ -65,6 +65,8 @@ function testRegistering() {
 function registerCb(regResponse) {
   state.regResponse = regResponse;
 
+  is(regResponse.errorCode, 0, "The registration did not error")
+
   // Parse the response data from the U2F token
   var registrationData = base64ToBytesUrlSafe(regResponse.registrationData);
   is(registrationData[0], 0x05, "Reserved byte is correct")

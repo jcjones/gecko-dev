@@ -45,6 +45,7 @@ pref("security.pki.cert_short_lifetime_in_days", 10);
 
 pref("security.webauth.u2f", true);
 pref("security.webauth.u2f.softtoken", false);
+pref("security.webauth.u2f.usbtoken", false);
 
 pref("security.ssl.errorReporting.enabled", true);
 pref("security.ssl.errorReporting.url", "https://data.mozilla.com/submit/sslreports");

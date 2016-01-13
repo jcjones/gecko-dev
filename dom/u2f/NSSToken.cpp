@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "NSSToken.h"
 #include "nss.h"
+#include "NSSToken.h"
 #include "pk11pub.h"
 
 #define U2F_PUBLIC_KEY_LEN 65
@@ -74,6 +74,8 @@ keyHandleFromKeyPair(SECKEYPrivateKey* aPrivKey, SECKEYPublicKey *aPubKey)
     return nullptr;
   }
 
+  // XXX Wrap with symmetric secret key (WebCryptoTask.cpp:754)
+
   size_t keyHandleLen = U2F_PUBLIC_KEY_LEN + privKeyItem->len;
   SECItem *keyHandleItem = ::SECITEM_AllocItem(nullptr, nullptr, keyHandleLen);
   memcpy(keyHandleItem->data,
@@ -91,6 +93,7 @@ static SECKEYPrivateKey* privateKeyFromKeyHandle(PK11SlotInfo *aSlot,
   SECItem privKeyItem = {siBuffer, aKeyHandle->data + U2F_PUBLIC_KEY_LEN,
                                    aKeyHandle->len - U2F_PUBLIC_KEY_LEN};
 
+  // XXX Unwrap with symmetric secret key
 
   ScopedSECItem objID(PK11_MakeIDFromPubKey(&pubKeyItem));
   if (!objID.get()) {
@@ -169,7 +172,7 @@ NSSToken::Register(const CryptoBuffer& /* aChallengeParam */,
     return NS_ERROR_FAILURE;
   }
 
-  // The key handle will be (pubKey || privateValue)
+  // The key handle will be (pubKey || wrappedPrivateValue)
   ScopedSECItem keyHandleItem(keyHandleFromKeyPair(privKey, pubKey));
   if (!keyHandleItem.get()) {
     return NS_ERROR_FAILURE;

@@ -7,11 +7,13 @@
 EXPORTS.mozilla.dom += [
     'NSSToken.h',
     'U2F.h',
+    'USBToken.h',
 ]
 
 UNIFIED_SOURCES += [
     'NSSToken.cpp',
     'U2F.cpp',
+    'USBToken.cpp',
 ]
 
 FINAL_LIBRARY = 'xul'

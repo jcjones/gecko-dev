@@ -9,13 +9,16 @@
 
 #include "js/TypeDecls.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/ErrorResult.h"
 #include "mozilla/dom/BindingDeclarations.h"
-#include "nsCycleCollectionParticipant.h"
-#include "nsWrapperCache.h"
-#include "nsPIDOMWindow.h"
 #include "mozilla/dom/Nullable.h"
+#include "mozilla/ErrorResult.h"
+#include "mozilla/Mutex.h"
+#include "nsCycleCollectionParticipant.h"
+#include "nsPIDOMWindow.h"
+#include "nsWrapperCache.h"
+
 #include "NSSToken.h"
+#include "USBToken.h"
 
 namespace mozilla {
 namespace dom {
@@ -71,7 +74,10 @@ public:
 private:
   nsCOMPtr<nsPIDOMWindow> mParent;
   nsString mOrigin;
-  NSSToken mToken;
+  NSSToken mSoftToken;
+  USBToken mUSBToken;
+
+  mozilla::Mutex mMutex;
 
   static const nsString FinishEnrollment;
   static const nsString GetAssertion;
