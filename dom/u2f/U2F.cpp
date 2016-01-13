@@ -22,6 +22,9 @@ enum class ErrorCode {
   TIMEOUT = 5
 };
 
+#define PREF_U2F_SOFTTOKEN_ENABLED "security.webauth.u2f.softtoken"
+#define PREF_U2F_USBTOKEN_ENABLED  "security.webauth.u2f.usbtoken"
+
 const nsString
 U2F::FinishEnrollment = NS_LITERAL_STRING("navigator.id.finishEnrollment");
 
@@ -137,10 +140,10 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
   MutexAutoLock lock(mMutex);
 
   const bool softTokenEnabled =
-    Preferences::GetBool("security.webauth.u2f.softtoken");
+    Preferences::GetBool(PREF_U2F_SOFTTOKEN_ENABLED);
 
   const bool usbTokenEnabled =
-    Preferences::GetBool("security.webauth.u2f.usbtoken");
+    Preferences::GetBool(PREF_U2F_USBTOKEN_ENABLED);
 
   // Search the requests for one a token can fulfill
   size_t i;
@@ -231,10 +234,10 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
   MutexAutoLock lock(mMutex);
 
   const bool softTokenEnabled =
-    Preferences::GetBool("security.webauth.u2f.softtoken");
+    Preferences::GetBool(PREF_U2F_SOFTTOKEN_ENABLED);
 
   const bool usbTokenEnabled =
-    Preferences::GetBool("security.webauth.u2f.usbtoken");
+    Preferences::GetBool(PREF_U2F_USBTOKEN_ENABLED);
 
   // Search the requests for one a token can fulfill
   size_t i;
