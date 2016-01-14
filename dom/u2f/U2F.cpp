@@ -42,6 +42,7 @@ const nsString ERR_DESERIALIZE = NS_LITERAL_STRING("Could not deserialize input"
 const nsString ERR_SIGN = NS_LITERAL_STRING("Could not sign");
 const nsString ERR_MEMORY = NS_LITERAL_STRING("Could not allocate memory");
 const nsString ERR_HASH = NS_LITERAL_STRING("Could not perform digest function");
+const nsString ERR_REG_SIGN_UNIMPLEMENTED = NS_LITERAL_STRING("The Register method does not support SignRequests");
 
 // Only needed for refcounted objects.
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_0(U2F)
@@ -139,11 +140,19 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
 {
   MutexAutoLock lock(mMutex);
 
+  // XXX Timeout after opt_timeoutSeconds
+
   const bool softTokenEnabled =
     Preferences::GetBool(PREF_U2F_SOFTTOKEN_ENABLED);
 
   const bool usbTokenEnabled =
     Preferences::GetBool(PREF_U2F_USBTOKEN_ENABLED);
+
+  if (signRequests.Length() > 0) {
+    // XXX fix
+    SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::BAD_REQUEST, ERR_REG_SIGN_UNIMPLEMENTED);
+    return;
+  }
 
   // Search the requests for one a token can fulfill
   size_t i;
@@ -163,11 +172,10 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
     // Verify the asserted appId
     if (!ValidAppID(request.mAppId.Value())) {
       SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::BAD_REQUEST, ERR_NO_APP_ID);
-      return;
+      continue;
     }
 
-    // Assemble a clientData object to send back
-    // XXX: Not needed until there's attestation
+    // Assemble a clientData object to send back and to hash
     CryptoBuffer clientData;
     nsresult rv = AssembleClientData(FinishEnrollment,
                                      request.mChallenge.Value(),
@@ -177,10 +185,34 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
       return;
     }
 
+    CryptoBuffer registrationData, appParam, challengeParam;
+    if (!appParam.SetLength(32, fallible) ||
+        !challengeParam.SetLength(32, fallible)) {
+      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_MEMORY);
+      return;
+    }
+
+    // XXX: Assumes that NSS is initialized
+
+    SECStatus srv;
+    nsCString appId = NS_ConvertUTF16toUTF8(request.mAppId.Value());
+
+    // Hash the AppID and the ClientData into the AppParam and ChallengeParam
+    srv = PK11_HashBuf(SEC_OID_SHA256, appParam.Elements(),
+                       (uint8_t*) appId.BeginReading(), appId.Length());
+    if (srv != SECSuccess) {
+      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_HASH);
+      return;
+    }
+
+    srv = PK11_HashBuf(SEC_OID_SHA256, challengeParam.Elements(),
+                       clientData.Elements(), clientData.Length());
+    if (srv != SECSuccess) {
+      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_HASH);
+      return;
+    }
+
     // Get the registration data from the token
-    // XXX: Should pass in a challengeParam and appParam
-    CryptoBuffer bogus;
-    CryptoBuffer registrationData;
     bool registerSuccess = false;
 
     if (usbTokenEnabled &&
@@ -190,7 +222,7 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
 
     if (softTokenEnabled &&
         (request.mVersion.Value() == mSoftToken.Version())) {
-      if (NS_FAILED(mSoftToken.Register(bogus, bogus, registrationData))) {
+      if (NS_FAILED(mSoftToken.Register(challengeParam, appParam, registrationData))) {
         SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_REGISTER);
         return;
       }
@@ -232,6 +264,8 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
           ErrorResult& aRv)
 {
   MutexAutoLock lock(mMutex);
+
+  // XXX Timeout after opt_timeoutSeconds
 
   const bool softTokenEnabled =
     Preferences::GetBool(PREF_U2F_SOFTTOKEN_ENABLED);

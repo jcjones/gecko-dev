@@ -66,6 +66,7 @@ function registerCb(regResponse) {
   state.regResponse = regResponse;
 
   is(regResponse.errorCode, 0, "The registration did not error")
+  is(regResponse.errorMessage, undefined, "The registration did not provide an error message")
 
   // Parse the response data from the U2F token
   var registrationData = base64ToBytesUrlSafe(regResponse.registrationData);
@@ -117,6 +118,7 @@ function signCb(signResponse) {
   state.signResponse = signResponse;
 
   is(signResponse.errorCode, 0, "The signing did not error")
+  is(signResponse.errorMessage, undefined, "The signing did not provide an error message")
 
   // Verify that the clientData makes sense
   var clientDataJSON = "";
