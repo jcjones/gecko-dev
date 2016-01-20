@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<meta charset=utf-8>
+<head>
+  <title>Test for Disabled FIDO Universal Second Factor</title>
+  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
+  <script src="u2futil.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body>
+<a target="_blank" href="https://bugzilla.mozilla.org/show_bug.cgi?id=1231681">Mozilla Bug 1231681</a>
+<p id="display"></p>
+<div id="content" style="display: none">
+</div>
+<pre id="test">
+<script class="testbody" type="text/javascript">
+SpecialPowers.setBoolPref("security.webauth.u2f", false);
+
+// XXX: Reviewers: This doesn't work, as I'm throwing from dom/base/nsGlobalWindow.cpp
+//      instead of returning undefined. How fixable is that? And how important?
+todo_is("u2f" in window, false, "feature detection should work")
+
+SpecialPowers.setBoolPref("security.webauth.u2f", true);
+
+is("u2f" in window, true, "should be able to re-enable")
+
+
+</script>
+</pre>
+</body>
+</html>

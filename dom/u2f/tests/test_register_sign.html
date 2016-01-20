@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <meta charset=utf-8>
 <head>
-  <title>Test for FIDO Universal Second Factor</title>
+  <title>Register and Sign Test for FIDO Universal Second Factor</title>
   <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
   <script src="u2futil.js"></script>
   <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
@@ -20,16 +20,6 @@ SpecialPowers.setBoolPref("security.webauth.u2f.softtoken", true);
 isnot(window.u2f, undefined, "U2F API endpoint must exist")
 isnot(window.u2f.register, undefined, "U2F Register API endpoint must exist")
 isnot(window.u2f.sign, undefined, "U2F Sign API endpoint must exist")
-
-SpecialPowers.setBoolPref("security.webauth.u2f", false);
-
-SimpleTest.doesThrow(function(){
-    var U2f = window.u2f;
-  },
-  "Test disabling U2F"
-);
-
-SpecialPowers.setBoolPref("security.webauth.u2f", true);
 
 var state = {
   // Raw messages

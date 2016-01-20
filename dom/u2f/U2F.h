@@ -12,7 +12,6 @@
 #include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/dom/Nullable.h"
 #include "mozilla/ErrorResult.h"
-#include "mozilla/Mutex.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsPIDOMWindow.h"
 #include "nsWrapperCache.h"
@@ -77,8 +76,6 @@ private:
   NSSToken mSoftToken;
   USBToken mUSBToken;
 
-  mozilla::Mutex mMutex;
-
   static const nsString FinishEnrollment;
   static const nsString GetAssertion;
 
@@ -88,7 +85,7 @@ private:
                      CryptoBuffer& aClientData);
 
   bool
-  ValidAppID(const nsString& aAppId);
+  ValidAppID(nsString& aAppId);
 };
 
 } // namespace dom

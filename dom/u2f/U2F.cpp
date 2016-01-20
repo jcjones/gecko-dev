@@ -8,6 +8,8 @@
 #include "mozilla/dom/U2F.h"
 #include "mozilla/dom/U2FBinding.h"
 #include "mozilla/Preferences.h"
+#include "nsURLParsers.h"
+#include "nsNetCID.h"
 #include "pk11pub.h"
 
 namespace mozilla {
@@ -31,18 +33,31 @@ U2F::FinishEnrollment = NS_LITERAL_STRING("navigator.id.finishEnrollment");
 const nsString
 U2F::GetAssertion = NS_LITERAL_STRING("navigator.id.getAssertion");
 
-// XXX I18N see dom/security/nsCSPUtils.cpp:28
-const nsString ERR_NO_TOKENS = NS_LITERAL_STRING("No U2F tokens were available");
-const nsString ERR_NO_VERSION = NS_LITERAL_STRING("No requests had the correct version");
-const nsString ERR_NO_APP_ID = NS_LITERAL_STRING("No valid App ID found");
-const nsString ERR_ASSEMBLE = NS_LITERAL_STRING("Could not assemble client data");
-const nsString ERR_REGISTER = NS_LITERAL_STRING("Register failed");
-const nsString ERR_SERIALIZE = NS_LITERAL_STRING("Could not serialize output");
-const nsString ERR_DESERIALIZE = NS_LITERAL_STRING("Could not deserialize input");
-const nsString ERR_SIGN = NS_LITERAL_STRING("Could not sign");
-const nsString ERR_MEMORY = NS_LITERAL_STRING("Could not allocate memory");
-const nsString ERR_HASH = NS_LITERAL_STRING("Could not perform digest function");
-const nsString ERR_REG_SIGN_UNIMPLEMENTED = NS_LITERAL_STRING("The Register method does not support SignRequests");
+// XXX Reviewers: Most U2F impls do not have error strings. If we keep them,
+//                do we need to internationalize? If so, note to self:
+//                see dom/security/nsCSPUtils.cpp:28
+const nsString ERR_NO_TOKENS =
+  NS_LITERAL_STRING("No U2F tokens were available");
+const nsString ERR_NO_VERSION =
+  NS_LITERAL_STRING("No requests had the correct version");
+const nsString ERR_NO_APP_ID =
+  NS_LITERAL_STRING("No valid App ID found");
+const nsString ERR_ASSEMBLE =
+  NS_LITERAL_STRING("Could not assemble client data");
+const nsString ERR_REGISTER =
+  NS_LITERAL_STRING("Register failed");
+const nsString ERR_SERIALIZE =
+  NS_LITERAL_STRING("Could not serialize output");
+const nsString ERR_DESERIALIZE =
+  NS_LITERAL_STRING("Could not deserialize input");
+const nsString ERR_SIGN =
+  NS_LITERAL_STRING("Could not sign");
+const nsString ERR_MEMORY =
+  NS_LITERAL_STRING("Could not allocate memory");
+const nsString ERR_HASH =
+  NS_LITERAL_STRING("Could not perform digest function");
+const nsString ERR_REG_SIGN_UNIMPLEMENTED =
+  NS_LITERAL_STRING("The Register method does not support SignRequests");
 
 // Only needed for refcounted objects.
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_0(U2F)
@@ -53,7 +68,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(U2F)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-U2F::U2F(): mMutex("U2F::mMutex")
+U2F::U2F()
 {}
 
 U2F::~U2F(){}
@@ -72,15 +87,13 @@ U2F::Init(nsPIDOMWindow* aParent) {
   nsCOMPtr<nsIDocument> doc = mParent->GetDoc();
   MOZ_ASSERT(doc);
 
-  // XXX: This feels a little odd.  Can this object ever live
+  // XXX: Reviewers: This feels a little odd.  Can this object ever live
   //      beyond the lifetime of the document?
   nsCString origin;
   nsresult rv = doc->NodePrincipal()->GetOrigin(origin);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
   mOrigin = NS_ConvertUTF8toUTF16(origin);
 
-  // Always initialize the soft token, in case the user flips the pref
-  // during runtime.
   rv = mSoftToken.Init();
   MOZ_ASSERT(NS_SUCCEEDED(rv));
 
@@ -112,12 +125,60 @@ U2F::AssembleClientData(const nsString& aTyp,
 }
 
 bool
-U2F::ValidAppID(const nsString& aAppId)
+U2F::ValidAppID(nsString& aAppId)
 {
-  // TODO implement this check
-  return true;
-}
+  nsCOMPtr<nsIURLParser> urlParser = do_GetService(NS_STDURLPARSER_CONTRACTID);
 
+  const char* facetUrl = NS_ConvertUTF16toUTF8(mOrigin).get();
+  uint32_t facetSchemePos;
+  int32_t facetSchemeLen;
+  uint32_t facetAuthPos;
+  int32_t facetAuthLen;
+  nsresult rv = urlParser->ParseURL(facetUrl, mOrigin.Length(),
+                                    &facetSchemePos, &facetSchemeLen,
+                                    &facetAuthPos, &facetAuthLen,
+                                    nullptr, nullptr);      // ignore path
+  if (NS_WARN_IF(NS_FAILED(rv))) { return false; }
+
+  nsAutoString facetScheme(Substring(mOrigin, facetSchemePos, facetSchemeLen));
+  nsAutoString facetAuth(Substring(mOrigin, facetAuthPos, facetAuthLen));
+
+  const char* appIdUrl = NS_ConvertUTF16toUTF8(aAppId).get();
+  uint32_t appIdAuthPos;
+  int32_t appIdAuthLen;
+  rv = urlParser->ParseURL(appIdUrl, aAppId.Length(),
+                           nullptr, nullptr,       // ignore scheme
+                           &appIdAuthPos, &appIdAuthLen,
+                           nullptr, nullptr);      // ignore path
+  if (NS_WARN_IF(NS_FAILED(rv))) { return false; }
+
+  nsAutoString appIdAuth(Substring(aAppId, appIdAuthPos, appIdAuthLen));
+
+  // if the URL is not HTTPS and matches the facet (mOrigin), accept
+  if (!facetScheme.LowerCaseEqualsLiteral("https") &&
+      (mOrigin == aAppId)) {
+    return true;
+  }
+
+  // If the URL is empty, copy in the "facetId" and accept
+  if (aAppId.IsEmpty()) {
+    aAppId.Assign(mOrigin);
+    return true;
+  }
+
+  // If the URL is HTTPS and the facetId and the appId auths match, accept
+  if (facetScheme.LowerCaseEqualsLiteral("https") &&
+      (facetAuth == appIdAuth)) {
+    return true;
+  }
+
+  // TODO Implement the remaining algorithm from FIDO AppID and Facets,
+  //      3.1.2 "Determining if a Caller's FacetID is Authorized for an AppID"
+
+  // XXX: Reviewers: Full implementation requires fetches; any pointers of
+  //      where to look for good remote loads would be great!
+  return false;
+}
 
 template <class CB, class Rsp>
 void
@@ -138,9 +199,7 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
               const Optional<Nullable<int32_t>>& opt_timeoutSeconds,
               ErrorResult& aRv)
 {
-  MutexAutoLock lock(mMutex);
-
-  // XXX Timeout after opt_timeoutSeconds
+  // TODO: Timeout after opt_timeoutSeconds
 
   const bool softTokenEnabled =
     Preferences::GetBool(PREF_U2F_SOFTTOKEN_ENABLED);
@@ -149,8 +208,9 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
     Preferences::GetBool(PREF_U2F_USBTOKEN_ENABLED);
 
   if (signRequests.Length() > 0) {
-    // XXX fix
-    SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::BAD_REQUEST, ERR_REG_SIGN_UNIMPLEMENTED);
+    SendError<U2FRegisterCallback, RegisterResponse>(callback,
+                                                     ErrorCode::BAD_REQUEST,
+                                                     ERR_REG_SIGN_UNIMPLEMENTED);
     return;
   }
 
@@ -163,52 +223,56 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
     if (!(request.mVersion.WasPassed() &&
         request.mChallenge.WasPassed() &&
         request.mAppId.WasPassed())) {
-      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_NO_APP_ID);
       continue;
     }
-
-    // TODO: Fail early if there's a verison mismatch?
 
     // Verify the asserted appId
     if (!ValidAppID(request.mAppId.Value())) {
-      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::BAD_REQUEST, ERR_NO_APP_ID);
       continue;
     }
 
-    // Assemble a clientData object to send back and to hash
     CryptoBuffer clientData;
     nsresult rv = AssembleClientData(FinishEnrollment,
                                      request.mChallenge.Value(),
                                      clientData);
     if (NS_FAILED(rv)) {
-      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_ASSEMBLE);
+      SendError<U2FRegisterCallback, RegisterResponse>(callback,
+                                                       ErrorCode::OTHER_ERROR,
+                                                       ERR_ASSEMBLE);
       return;
     }
 
     CryptoBuffer registrationData, appParam, challengeParam;
     if (!appParam.SetLength(32, fallible) ||
         !challengeParam.SetLength(32, fallible)) {
-      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_MEMORY);
+      SendError<U2FRegisterCallback, RegisterResponse>(callback,
+                                                       ErrorCode::OTHER_ERROR,
+                                                       ERR_MEMORY);
       return;
     }
 
-    // XXX: Assumes that NSS is initialized
-
     SECStatus srv;
     nsCString appId = NS_ConvertUTF16toUTF8(request.mAppId.Value());
+
+    // XXX: Reviewers: Does this class need an nsNSSShutDownPreventionLock
+    //      due to the use of the digests? Should that just out of mSoftToken?
 
     // Hash the AppID and the ClientData into the AppParam and ChallengeParam
     srv = PK11_HashBuf(SEC_OID_SHA256, appParam.Elements(),
                        (uint8_t*) appId.BeginReading(), appId.Length());
     if (srv != SECSuccess) {
-      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_HASH);
+      SendError<U2FRegisterCallback, RegisterResponse>(callback,
+                                                       ErrorCode::OTHER_ERROR,
+                                                       ERR_HASH);
       return;
     }
 
     srv = PK11_HashBuf(SEC_OID_SHA256, challengeParam.Elements(),
                        clientData.Elements(), clientData.Length());
     if (srv != SECSuccess) {
-      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_HASH);
+      SendError<U2FRegisterCallback, RegisterResponse>(callback,
+                                                       ErrorCode::OTHER_ERROR,
+                                                       ERR_HASH);
       return;
     }
 
@@ -220,10 +284,13 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
         // not yet implemented; fallthrough
     }
 
-    if (softTokenEnabled &&
+    if (softTokenEnabled && !registerSuccess &&
         (request.mVersion.Value() == mSoftToken.Version())) {
-      if (NS_FAILED(mSoftToken.Register(challengeParam, appParam, registrationData))) {
-        SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_REGISTER);
+      if (NS_FAILED(mSoftToken.Register(challengeParam,
+                                        appParam, registrationData))) {
+        SendError<U2FRegisterCallback, RegisterResponse>(callback,
+                                                         ErrorCode::OTHER_ERROR,
+                                                         ERR_REGISTER);
         return;
       }
       registerSuccess = true;
@@ -238,7 +305,9 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
     nsString clientDataBase64, registrationDataBase64;
     if (NS_FAILED(clientData.ToJwkBase64(clientDataBase64)) ||
         NS_FAILED(registrationData.ToJwkBase64(registrationDataBase64))) {
-      SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::OTHER_ERROR, ERR_SERIALIZE);
+      SendError<U2FRegisterCallback, RegisterResponse>(callback,
+                                                       ErrorCode::OTHER_ERROR,
+                                                       ERR_SERIALIZE);
       return;
     }
 
@@ -253,7 +322,9 @@ U2F::Register(const Sequence<RegisterRequest>& registerRequests,
   }
 
   // Nothing could satisfy
-  SendError<U2FRegisterCallback, RegisterResponse>(callback, ErrorCode::BAD_REQUEST, ERR_NO_VERSION);
+  SendError<U2FRegisterCallback, RegisterResponse>(callback,
+                                                   ErrorCode::BAD_REQUEST,
+                                                   ERR_NO_VERSION);
   return;
 }
 
@@ -263,9 +334,7 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
           const Optional<Nullable<int32_t>>& opt_timeoutSeconds,
           ErrorResult& aRv)
 {
-  MutexAutoLock lock(mMutex);
-
-  // XXX Timeout after opt_timeoutSeconds
+  // TODO Timeout after opt_timeoutSeconds
 
   const bool softTokenEnabled =
     Preferences::GetBool(PREF_U2F_SOFTTOKEN_ENABLED);
@@ -283,15 +352,17 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
         request.mChallenge.WasPassed() &&
         request.mAppId.WasPassed() &&
         request.mKeyHandle.WasPassed())) {
-      SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_NO_APP_ID);
+      SendError<U2FSignCallback, SignResponse>(callback,
+                                               ErrorCode::OTHER_ERROR,
+                                               ERR_NO_APP_ID);
       continue;
     }
 
-    // TODO: Fail early if there's a verison mismatch?
-
     // Verify the asserted appId
     if (!ValidAppID(request.mAppId.Value())) {
-      SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::BAD_REQUEST, ERR_NO_APP_ID);
+      SendError<U2FSignCallback, SignResponse>(callback,
+                                               ErrorCode::BAD_REQUEST,
+                                               ERR_NO_APP_ID);
       return;
     }
 
@@ -301,32 +372,39 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
                                      request.mChallenge.Value(),
                                      clientData);
     if (NS_FAILED(rv)) {
-      SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_ASSEMBLE);
+      SendError<U2FSignCallback, SignResponse>(callback,
+                                               ErrorCode::OTHER_ERROR,
+                                               ERR_ASSEMBLE);
       return;
     }
 
     // Digest the appId and the clientData
-    // XXX: Assumes that NSS is initialized
     SECStatus srv;
     nsCString appId = NS_ConvertUTF16toUTF8(request.mAppId.Value());
     CryptoBuffer appParam, challengeParam;
     if (!appParam.SetLength(32, fallible) ||
         !challengeParam.SetLength(32, fallible)) {
-      SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_MEMORY);
+      SendError<U2FSignCallback, SignResponse>(callback,
+                                               ErrorCode::OTHER_ERROR,
+                                               ERR_MEMORY);
       return;
     }
 
     srv = PK11_HashBuf(SEC_OID_SHA256, appParam.Elements(),
                        (uint8_t*) appId.BeginReading(), appId.Length());
     if (srv != SECSuccess) {
-      SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_HASH);
+      SendError<U2FSignCallback, SignResponse>(callback,
+                                               ErrorCode::OTHER_ERROR,
+                                               ERR_HASH);
       return;
     }
 
     srv = PK11_HashBuf(SEC_OID_SHA256, challengeParam.Elements(),
                        clientData.Elements(), clientData.Length());
     if (srv != SECSuccess) {
-      SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_HASH);
+      SendError<U2FSignCallback, SignResponse>(callback,
+                                               ErrorCode::OTHER_ERROR,
+                                               ERR_HASH);
       return;
     }
 
@@ -334,7 +412,9 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
     CryptoBuffer keyHandle;
     rv = keyHandle.FromJwkBase64(request.mKeyHandle.Value());
     if (NS_FAILED(rv)) {
-      SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_DESERIALIZE);
+      SendError<U2FSignCallback, SignResponse>(callback,
+                                               ErrorCode::OTHER_ERROR,
+                                               ERR_DESERIALIZE);
       return;
     }
 
@@ -344,13 +424,16 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
 
     if (usbTokenEnabled &&
         (request.mVersion.Value() == mUSBToken.Version())) {
-        // not yet implemented; fallthrough
+        // TODO: usbToken not yet implemented; fallthrough
     }
 
     if (softTokenEnabled &&
         (request.mVersion.Value() == mSoftToken.Version())) {
-      if (NS_FAILED(mSoftToken.Sign(appParam, challengeParam, keyHandle, signatureData))) {
-        SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_SIGN);
+      if (NS_FAILED(mSoftToken.Sign(appParam, challengeParam,
+                                    keyHandle, signatureData))) {
+        SendError<U2FSignCallback, SignResponse>(callback,
+                                                 ErrorCode::OTHER_ERROR,
+                                                 ERR_SIGN);
         return;
       }
       signSuccess = true;
@@ -365,7 +448,9 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
     nsString clientDataBase64, signatureDataBase64;
     if (NS_FAILED(clientData.ToJwkBase64(clientDataBase64)) ||
         NS_FAILED(signatureData.ToJwkBase64(signatureDataBase64))) {
-      SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::OTHER_ERROR, ERR_SERIALIZE);
+      SendError<U2FSignCallback, SignResponse>(callback,
+                                               ErrorCode::OTHER_ERROR,
+                                               ERR_SERIALIZE);
       return;
     }
     SignResponse response;
@@ -380,10 +465,11 @@ U2F::Sign(const Sequence<SignRequest>& signRequests,
   }
 
   // Nothing could satisfy
-  SendError<U2FSignCallback, SignResponse>(callback, ErrorCode::BAD_REQUEST, ERR_NO_VERSION);
+  SendError<U2FSignCallback, SignResponse>(callback,
+                                           ErrorCode::BAD_REQUEST,
+                                           ERR_NO_VERSION);
   return;
 }
-
 
 } // namespace dom
 } // namespace mozilla

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<meta charset=utf-8>
+<head>
+  <title>Test for AppID / FacetID behavior for FIDO Universal Second Factor</title>
+  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
+  <script src="u2futil.js"></script>
+
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body>
+<a target="_blank" href="https://bugzilla.mozilla.org/show_bug.cgi?id=1231681">Mozilla Bug 1231681</a>
+<p id="display"></p>
+<div id="content" style="display: none">
+</div>
+<pre id="test">
+<script class="testbody" type="text/javascript">
+SpecialPowers.setBoolPref("security.webauth.u2f", true);
+SpecialPowers.setBoolPref("security.webauth.u2f.softtoken", true);
+
+var version = "U2F_V2";
+var challenge = new Uint8Array(16);
+
+function expectSuccess(res) {
+  is(res.errorCode, 0, "The registration errorred");
+};
+
+function expectFailure(res) {
+  isnot(res.errorCode, 0, "The registration did not error");
+};
+
+// XXX: Reviewers: These tests are still being worked through, as I need
+//      to handle the case of loading the test over HTTPS, such as is done
+//      for the Mixed Content tests.
+
+u2f.register([{
+  version: version,
+  challenge: bytesToBase64UrlSafe(challenge),
+  appId: null,
+}], [], expectSuccess);
+
+u2f.register([{
+  version: version,
+  challenge: bytesToBase64UrlSafe(challenge),
+  appId: ""
+}], [], expectSuccess);
+
+u2f.register([{
+  version: version,
+  challenge: bytesToBase64UrlSafe(challenge),
+  appId: "http://example.com/appId",
+}], [], expectFailure);
+
+u2f.register([{
+  version: version,
+  challenge: bytesToBase64UrlSafe(challenge),
+  appId: "https://example.com/appId",
+}], [], expectFailure);
+
+u2f.register([{
+  version: version,
+  challenge: bytesToBase64UrlSafe(challenge),
+  appId: window.location.origin + "/otherAppId",
+}], [], expectSuccess);
+
+</script>
+</pre>
+</body>
+</html>

@@ -8,6 +8,7 @@
 #define mozilla_dom_NSSToken_h
 
 #include "mozilla/dom/CryptoBuffer.h"
+#include "mozilla/Mutex.h"
 #include "nsNSSShutDown.h"
 #include "ScopedNSSTypes.h"
 
@@ -31,7 +32,7 @@ public:
 
   nsresult Register(const CryptoBuffer& aApplicationParam,
                     const CryptoBuffer& aChallengeParam,
-                    CryptoBuffer& aRegistrationData) const ;
+                    CryptoBuffer& aRegistrationData) ;
 
   nsresult Sign(const CryptoBuffer& aApplicationParam,
                 const CryptoBuffer& aChallengeParam,
@@ -46,6 +47,7 @@ private:
   bool mInitialized;
   uint32_t mCounter;
   ScopedPK11SlotInfo mSlot;
+  mozilla::Mutex mMutex;
 
   static const nsString mVersion;
 };

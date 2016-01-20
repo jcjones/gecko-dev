@@ -18,9 +18,12 @@
 namespace mozilla {
 namespace dom {
 
+const nsString NSSToken::mVersion = NS_LITERAL_STRING("U2F_V2");
+
 NSSToken::NSSToken()
   : mInitialized(false)
   , mCounter(0)
+  , mMutex("NSSToken::mMutex")
 {}
 
 NSSToken::~NSSToken()
@@ -38,6 +41,7 @@ NSSToken::Init()
     return NS_OK;
   }
 
+  // XXX: Reviewers -- Is this necessary?
   SECStatus srv = NSS_NoDB_Init(NULL);
   if (srv != SECSuccess) {
     return NS_ERROR_FAILURE;
@@ -51,8 +55,6 @@ NSSToken::Init()
   mInitialized = true;
   return NS_OK;
 }
-
-const nsString NSSToken::mVersion = NS_LITERAL_STRING("U2F_V2");
 
 const nsString&
 NSSToken::Version() const
@@ -142,7 +144,7 @@ static SECKEYPrivateKey* privateKeyFromKeyHandle(PK11SlotInfo *aSlot,
 nsresult
 NSSToken::Register(const CryptoBuffer& /* aChallengeParam */,
                    const CryptoBuffer& /* aApplicationParam */,
-                   CryptoBuffer& aRegistrationData) const
+                   CryptoBuffer& aRegistrationData)
 {
   nsNSSShutDownPreventionLock locker;
   if (isAlreadyShutDown()) {
@@ -155,6 +157,9 @@ NSSToken::Register(const CryptoBuffer& /* aChallengeParam */,
 
   ScopedSECKEYPrivateKey privKey;
   ScopedSECKEYPublicKey pubKey;
+
+  // Protect mSlot
+  MutexAutoLock lock(mMutex);
 
   // Generate a key pair
   CK_MECHANISM_TYPE mechanism = CKM_EC_KEY_PAIR_GEN;
@@ -184,10 +189,14 @@ NSSToken::Register(const CryptoBuffer& /* aChallengeParam */,
     return NS_ERROR_FAILURE;
   };
   uint8_t *data = aRegistrationData.Elements();
+
   data[0] = 0x05;
-  memcpy(data + 1, pubKey->u.ec.publicValue.data, pubKey->u.ec.publicValue.len);
+  memcpy(data + 1,
+         pubKey->u.ec.publicValue.data, pubKey->u.ec.publicValue.len);
+
   data[1 + U2F_PUBLIC_KEY_LEN] = keyHandleItem->len;
-  memcpy(data + 1 + U2F_PUBLIC_KEY_LEN + 1, keyHandleItem->data, keyHandleItem->len);
+  memcpy(data + 1 + U2F_PUBLIC_KEY_LEN + 1,
+         keyHandleItem->data, keyHandleItem->len);
   return NS_OK;
 }
 
@@ -228,6 +237,9 @@ NSSToken::Sign(const CryptoBuffer& aApplicationParam,
       (aApplicationParam.Length() != U2F_PARAM_LEN)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
+
+  // Protect mSlot
+  MutexAutoLock lock(mMutex);
 
   // Decode the key handle
   ScopedSECItem keyHandleItem(::SECITEM_AllocItem(nullptr, nullptr, 0));
