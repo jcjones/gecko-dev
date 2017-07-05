@@ -15,6 +15,7 @@ extern crate webrender_bindings;
 extern crate cubeb_pulse;
 extern crate encoding_c;
 extern crate encoding_glue;
+extern crate u2fhid;
 
 use std::boxed::Box;
 use std::ffi::CStr;
