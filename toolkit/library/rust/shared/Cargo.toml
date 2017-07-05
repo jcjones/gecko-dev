@@ -15,6 +15,7 @@ webrender_bindings = { path = "../../../../gfx/webrender_bindings", optional = t
 cubeb-pulse = { path = "../../../../media/libcubeb/cubeb-pulse-rs", optional = true, features=["pulse-dlopen"] }
 encoding_c = "0.7.1"
 encoding_glue = { path = "../../../../intl/encoding_glue" }
+u2fhid = { path = "../../../../dom/webauthn/u2f-hid-rs" }
 
 [features]
 default = []
