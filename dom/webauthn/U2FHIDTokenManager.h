@@ -113,8 +113,8 @@ private:
 
   rust_u2f_mgr* mU2FManager;
   uint64_t mTransactionId;
-  UniquePtr<MozPromiseHolder<U2FRegisterPromise>> mRegisterPromise;
-  UniquePtr<MozPromiseHolder<U2FSignPromise>> mSignPromise;
+  MozPromiseHolder<U2FRegisterPromise> mRegisterPromise;
+  MozPromiseHolder<U2FSignPromise> mSignPromise;
 };
 
 } // namespace dom

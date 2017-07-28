@@ -95,6 +95,8 @@ U2FHIDTokenManager::Register(const nsTArray<WebAuthnScopedCredentialDescriptor>&
 {
   MOZ_ASSERT(NS_GetCurrentThread() == gPBackgroundThread);
 
+  mRegisterPromise.RejectIfExists(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
+
   bool rv = rust_u2f_mgr_register(mU2FManager,
                                   ++mTransactionId,
                                   (uint64_t)aTimeoutMS / 1000U,
@@ -108,8 +110,7 @@ U2FHIDTokenManager::Register(const nsTArray<WebAuthnScopedCredentialDescriptor>&
     return U2FRegisterPromise::CreateAndReject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
   }
 
-  mRegisterPromise = MakeUnique<MozPromiseHolder<U2FRegisterPromise>>();
-  return mRegisterPromise->Ensure(__func__);
+  return mRegisterPromise.Ensure(__func__);
 }
 
 // A U2F Sign operation creates a signature over the "param" arguments (plus
@@ -136,6 +137,8 @@ U2FHIDTokenManager::Sign(const nsTArray<WebAuthnScopedCredentialDescriptor>& aDe
 {
   MOZ_ASSERT(NS_GetCurrentThread() == gPBackgroundThread);
 
+  mSignPromise.RejectIfExists(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
+
   U2FKeyHandles keyHandles(aDescriptors);
   bool rv = rust_u2f_mgr_sign(mU2FManager,
                               ++mTransactionId,
@@ -151,8 +154,7 @@ U2FHIDTokenManager::Sign(const nsTArray<WebAuthnScopedCredentialDescriptor>& aDe
     return U2FSignPromise::CreateAndReject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
   }
 
-  mSignPromise = MakeUnique<MozPromiseHolder<U2FSignPromise>>();
-  return mSignPromise->Ensure(__func__);
+  return mSignPromise.Ensure(__func__);
 }
 
 void
@@ -160,22 +162,15 @@ U2FHIDTokenManager::Cancel()
 {
   MOZ_ASSERT(NS_GetCurrentThread() == gPBackgroundThread);
 
-  if (!mRegisterPromise && !mSignPromise) {
+  if (mRegisterPromise.IsEmpty() && mSignPromise.IsEmpty()) {
     return;
   }
 
   mTransactionId++;
   rust_u2f_mgr_cancel(mU2FManager);
 
-  if (mRegisterPromise) {
-    mRegisterPromise->Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
-    mRegisterPromise = nullptr;
-  }
-
-  if (mSignPromise) {
-    mSignPromise->Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
-    mSignPromise = nullptr;
-  }
+  mRegisterPromise.RejectIfExists(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
+  mSignPromise.RejectIfExists(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
 }
 
 void
@@ -187,18 +182,14 @@ U2FHIDTokenManager::HandleRegisterResult(UniquePtr<U2FResult>&& aResult)
     return;
   }
 
-  MOZ_ASSERT(mRegisterPromise);
-
   nsTArray<uint8_t> registration;
   if (!aResult->CopyRegistration(registration)) {
-    mRegisterPromise->Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
-    mRegisterPromise = nullptr;
+    mRegisterPromise.Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
     return;
   }
 
   U2FRegisterResult result(Move(registration));
-  mRegisterPromise->Resolve(Move(result), __func__);
-  mRegisterPromise = nullptr;
+  mRegisterPromise.Resolve(Move(result), __func__);
 }
 
 void
@@ -210,25 +201,20 @@ U2FHIDTokenManager::HandleSignResult(UniquePtr<U2FResult>&& aResult)
     return;
   }
 
-  MOZ_ASSERT(mSignPromise);
-
   nsTArray<uint8_t> keyHandle;
   if (!aResult->CopyKeyHandle(keyHandle)) {
-    mSignPromise->Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
-    mSignPromise = nullptr;
+    mSignPromise.Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
     return;
   }
 
   nsTArray<uint8_t> signature;
   if (!aResult->CopySignature(signature)) {
-    mSignPromise->Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
-    mSignPromise = nullptr;
+    mSignPromise.Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
     return;
   }
 
   U2FSignResult result(Move(keyHandle), Move(signature));
-  mSignPromise->Resolve(Move(result), __func__);
-  mSignPromise = nullptr;
+  mSignPromise.Resolve(Move(result), __func__);
 }
 
 }

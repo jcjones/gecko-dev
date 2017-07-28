@@ -192,10 +192,8 @@ U2FTokenManager::ClearTransaction()
   // Drop managers at the end of all transactions
   mTokenManagerImpl = nullptr;
   // Drop promises.
-  mRegisterPromiseHolder.DisconnectIfExists();
-  mRegisterPromise = nullptr;
-  mSignPromiseHolder.DisconnectIfExists();
-  mSignPromise = nullptr;
+  mRegisterPromise.DisconnectIfExists();
+  mSignPromise.DisconnectIfExists();
   // Increase in case we're called by the WebAuthnTransactionParent.
   mTransactionId++;
 }
@@ -244,6 +242,8 @@ U2FTokenManager::Register(WebAuthnTransactionParent* aTransactionParent,
     return;
   }
 
+  // mRegisterPromise->DisconnectIfExists();
+
   // Check if all the supplied parameters are syntactically well-formed and
   // of the correct length. If not, return an error code equivalent to
   // UnknownError and terminate the operation.
@@ -254,12 +254,12 @@ U2FTokenManager::Register(WebAuthnTransactionParent* aTransactionParent,
     return;
   }
 
-  mRegisterPromise = mTokenManagerImpl->Register(aTransactionInfo.Descriptors(),
+  auto promise = mTokenManagerImpl->Register(aTransactionInfo.Descriptors(),
                                                  aTransactionInfo.RpIdHash(),
                                                  aTransactionInfo.ClientDataHash(),
                                                  aTransactionInfo.TimeoutMS());
 
-  mRegisterPromise->Then(GetCurrentThreadSerialEventTarget(), __func__,
+  promise->Then(GetCurrentThreadSerialEventTarget(), __func__,
                          [tid](U2FRegisterResult&& aResult) {
                            U2FTokenManager* mgr = U2FTokenManager::Get();
                            mgr->MaybeConfirmRegister(tid, aResult);
@@ -269,7 +269,7 @@ U2FTokenManager::Register(WebAuthnTransactionParent* aTransactionParent,
                            U2FTokenManager* mgr = U2FTokenManager::Get();
                            mgr->MaybeAbortTransaction(tid, rv);
                          })
-                  ->Track(mRegisterPromiseHolder);
+         ->Track(mRegisterPromise);
 }
 
 void
@@ -280,8 +280,7 @@ U2FTokenManager::MaybeConfirmRegister(uint64_t aTransactionId,
     return;
   }
 
-  mRegisterPromiseHolder.Complete();
-  mRegisterPromise = nullptr;
+  mRegisterPromise.Complete();
 
   nsTArray<uint8_t> registration;
   aResult.ConsumeRegistration(registration);
@@ -306,18 +305,20 @@ U2FTokenManager::Sign(WebAuthnTransactionParent* aTransactionParent,
     return;
   }
 
+  // mSignPromise->DisconnectIfExists();
+
   if ((aTransactionInfo.RpIdHash().Length() != SHA256_LENGTH) ||
       (aTransactionInfo.ClientDataHash().Length() != SHA256_LENGTH)) {
     AbortTransaction(NS_ERROR_DOM_UNKNOWN_ERR);
     return;
   }
 
-  mSignPromise = mTokenManagerImpl->Sign(aTransactionInfo.Descriptors(),
+  auto promise = mTokenManagerImpl->Sign(aTransactionInfo.Descriptors(),
                                          aTransactionInfo.RpIdHash(),
                                          aTransactionInfo.ClientDataHash(),
                                          aTransactionInfo.TimeoutMS());
 
-  mSignPromise->Then(GetCurrentThreadSerialEventTarget(), __func__,
+  promise->Then(GetCurrentThreadSerialEventTarget(), __func__,
                      [tid](U2FSignResult&& aResult) {
                        U2FTokenManager* mgr = U2FTokenManager::Get();
                        mgr->MaybeConfirmSign(tid, aResult);
@@ -327,7 +328,7 @@ U2FTokenManager::Sign(WebAuthnTransactionParent* aTransactionParent,
                        U2FTokenManager* mgr = U2FTokenManager::Get();
                        mgr->MaybeAbortTransaction(tid, rv);
                      })
-              ->Track(mSignPromiseHolder);
+         ->Track(mSignPromise);
 }
 
 void
@@ -338,8 +339,7 @@ U2FTokenManager::MaybeConfirmSign(uint64_t aTransactionId,
     return;
   }
 
-  mSignPromiseHolder.Complete();
-  mSignPromise = nullptr;
+  mSignPromise.Complete();
 
   nsTArray<uint8_t> keyHandle;
   aResult.ConsumeKeyHandle(keyHandle);
