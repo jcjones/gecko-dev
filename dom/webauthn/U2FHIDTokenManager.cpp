@@ -97,7 +97,7 @@ U2FHIDTokenManager::Register(const nsTArray<WebAuthnScopedCredentialDescriptor>&
 
   bool rv = rust_u2f_mgr_register(mU2FManager,
                                   ++mTransactionId,
-                                  (uint64_t)aTimeoutMS * 1000U,
+                                  (uint64_t)aTimeoutMS / 1000U,
                                   u2f_register_callback,
                                   aChallenge.Elements(),
                                   aChallenge.Length(),
@@ -139,7 +139,7 @@ U2FHIDTokenManager::Sign(const nsTArray<WebAuthnScopedCredentialDescriptor>& aDe
   U2FKeyHandles keyHandles(aDescriptors);
   bool rv = rust_u2f_mgr_sign(mU2FManager,
                               ++mTransactionId,
-                              (uint64_t)aTimeoutMS * 1000U,
+                              (uint64_t)aTimeoutMS / 1000U,
                               u2f_sign_callback,
                               aChallenge.Elements(),
                               aChallenge.Length(),

@@ -192,7 +192,9 @@ U2FTokenManager::ClearTransaction()
   // Drop managers at the end of all transactions
   mTokenManagerImpl = nullptr;
   // Drop promises.
+  mRegisterPromiseHolder.DisconnectIfExists();
   mRegisterPromise = nullptr;
+  mSignPromiseHolder.DisconnectIfExists();
   mSignPromise = nullptr;
   // Increase in case we're called by the WebAuthnTransactionParent.
   mTransactionId++;
@@ -266,7 +268,8 @@ U2FTokenManager::Register(WebAuthnTransactionParent* aTransactionParent,
                            MOZ_ASSERT(NS_FAILED(rv));
                            U2FTokenManager* mgr = U2FTokenManager::Get();
                            mgr->MaybeAbortTransaction(tid, rv);
-                         });
+                         })
+                  ->Track(mRegisterPromiseHolder);
 }
 
 void
@@ -276,6 +279,9 @@ U2FTokenManager::MaybeConfirmRegister(uint64_t aTransactionId,
   if (mTransactionId != aTransactionId) {
     return;
   }
+
+  mRegisterPromiseHolder.Complete();
+  mRegisterPromise = nullptr;
 
   nsTArray<uint8_t> registration;
   aResult.ConsumeRegistration(registration);
@@ -320,7 +326,8 @@ U2FTokenManager::Sign(WebAuthnTransactionParent* aTransactionParent,
                        MOZ_ASSERT(NS_FAILED(rv));
                        U2FTokenManager* mgr = U2FTokenManager::Get();
                        mgr->MaybeAbortTransaction(tid, rv);
-                     });
+                     })
+              ->Track(mSignPromiseHolder);
 }
 
 void
@@ -330,6 +337,9 @@ U2FTokenManager::MaybeConfirmSign(uint64_t aTransactionId,
   if (mTransactionId != aTransactionId) {
     return;
   }
+
+  mSignPromiseHolder.Complete();
+  mSignPromise = nullptr;
 
   nsTArray<uint8_t> keyHandle;
   aResult.ConsumeKeyHandle(keyHandle);

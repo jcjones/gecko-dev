@@ -60,7 +60,9 @@ private:
   WebAuthnTransactionParent* mTransactionParent;
   RefPtr<U2FTokenTransport> mTokenManagerImpl;
   RefPtr<U2FRegisterPromise> mRegisterPromise;
+  MozPromiseRequestHolder<U2FRegisterPromise> mRegisterPromiseHolder;
   RefPtr<U2FSignPromise> mSignPromise;
+  MozPromiseRequestHolder<U2FSignPromise> mSignPromiseHolder;
   // Guards the asynchronous promise resolution of token manager impls.
   // We don't need to protect this with a lock as it will only be modified
   // and checked on the PBackground thread in the parent process.
