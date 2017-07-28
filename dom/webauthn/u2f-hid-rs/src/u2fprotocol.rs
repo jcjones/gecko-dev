@@ -188,6 +188,7 @@ pub fn u2f_register<T>(
 where
     T: U2FDevice + Read + Write,
 {
+    println!("u2fprotocol::u2f_register 1");
     if challenge.len() != PARAMETER_SIZE || application.len() != PARAMETER_SIZE {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -201,12 +202,14 @@ where
     register_data.extend(challenge);
     register_data.extend(application);
 
+println!("u2fprotocol::u2f_register 2");
     let register_resp = try!(send_apdu(
         dev,
         U2F_REGISTER,
         flags | U2F_REQUEST_USER_PRESENCE,
         &register_data,
     ));
+println!("u2fprotocol::u2f_register 3");
 
     if register_resp.len() != 2 {
         // Real data, we're done

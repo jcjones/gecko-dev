@@ -107,27 +107,35 @@ pub unsafe extern "C" fn rust_u2f_mgr_register(
     application_ptr: *const u8,
     application_len: usize,
 ) -> bool {
+    println!("rust_u2f_mgr_register 1");
     if mgr.is_null() {
         return false;
     }
+    println!("rust_u2f_mgr_register 2");
 
     // Check buffers.
     if challenge_ptr.is_null() || application_ptr.is_null() {
         return false;
     }
+    println!("rust_u2f_mgr_register 3");
 
     let challenge = from_raw(challenge_ptr, challenge_len);
     let application = from_raw(application_ptr, application_len);
 
     let res = (*mgr).register(timeout, challenge, application, move |rv| {
+        println!("rust_u2f_mgr_register::register 1");
         if let Ok(registration) = rv {
+            println!("rust_u2f_mgr_register::register 1");
             let mut result = U2FResult::new();
             result.insert(RESBUF_ID_REGISTRATION, registration);
             callback(tid, Box::into_raw(Box::new(result)));
+            println!("rust_u2f_mgr_register::register 2");
         } else {
             callback(tid, ptr::null_mut());
+            println!("rust_u2f_mgr_register::register I AM THE ERROR");
         };
     });
+    println!("rust_u2f_mgr_register 4");
 
     res.is_ok()
 }

@@ -44,6 +44,8 @@ impl PlatformManager {
         application: Vec<u8>,
         callback: OnceCallback<Vec<u8>>,
     ) {
+        println!("PlatformManager::register 1");
+
         // Abort any prior register/sign calls.
         self.cancel();
 
@@ -51,17 +53,21 @@ impl PlatformManager {
 
         let thread = RunLoop::new(
             move |alive| {
+                println!("PlatformManager::register:thread 1");
                 let mut devices = HashMap::new();
                 let monitor = try_or!(Monitor::new(), |e| { callback.call(Err(e)); });
 
                 'top: while alive() && monitor.alive() {
+                    println!("PlatformManager::register:thread in loop");
                     for event in monitor.events() {
                         process_event(&mut devices, event);
                     }
 
                     for device in devices.values_mut() {
+                        println!("PlatformManager::register:thread device loop");
                         // Caller asked us to register, so the first token that does wins
                         if let Ok(bytes) = u2f_register(device, &challenge, &application) {
+                            println!("PlatformManager::register:thread calling callback");
                             callback.call(Ok(bytes));
                             return;
                         }
@@ -69,7 +75,7 @@ impl PlatformManager {
                         // Check to see if monitor.events has any hotplug events that we'll need
                         // to handle
                         if monitor.events().size_hint().0 > 0 {
-                            debug!("Hotplug event; restarting loop");
+                            println!("Hotplug event; restarting loop");
                             continue 'top;
                         }
                     }
@@ -152,7 +158,7 @@ impl PlatformManager {
                             // Check to see if monitor.events has any hotplug events that we'll
                             // need to handle
                             if monitor.events().size_hint().0 > 0 {
-                                debug!("Hotplug event; restarting loop");
+                                println!("Hotplug event; restarting loop");
                                 continue 'top;
                             }
                         }
@@ -223,19 +229,19 @@ fn maybe_add_device(devs: &mut HashMap<IOHIDDeviceRef, Device>, device_ref: IOHI
         return;
     }
 
-    debug!("added U2F device {}", dev);
+    println!("added U2F device {}", dev);
     devs.insert(device_ref, dev);
 }
 
 fn maybe_remove_device(devs: &mut HashMap<IOHIDDeviceRef, Device>, device_ref: IOHIDDeviceRef) {
     match devs.remove(&device_ref) {
         Some(dev) => {
-            debug!("removing U2F device {}", dev);
+            println!("removing U2F device {}", dev);
             // Re-allocate this raw pointer for destruction
             let _ = unsafe { Box::from_raw(dev.report_send_void) };
         }
         None => {
-            warn!("Couldn't remove {:?}", device_ref);
+            println!("Couldn't remove {:?}", device_ref);
         }
     }
 }
@@ -260,7 +266,7 @@ extern "C" fn read_new_data_cb(
     unsafe {
         let tx: &mut Sender<Report> = &mut *(context as *mut Sender<Report>);
 
-        trace!(
+        println!(
             "read_new_data_cb type={} id={} report={:?} len={}",
             report_type,
             report_id,
@@ -273,7 +279,7 @@ extern "C" fn read_new_data_cb(
         if report_len as usize <= HID_RPT_SIZE {
             ptr::copy(report, report_obj.data.as_mut_ptr(), report_len as usize);
         } else {
-            warn!(
+            println!(
                 "read_new_data_cb got too much data! {} > {}",
                 report_len,
                 HID_RPT_SIZE
@@ -284,7 +290,7 @@ extern "C" fn read_new_data_cb(
             // TOOD: This happens when the channel closes before this thread
             // does. This is pretty common, but let's deal with stopping
             // properly later.
-            warn!("Problem returning read_new_data_cb data for thread: {}", e);
+            println!("Problem returning read_new_data_cb data for thread: {}", e);
         };
     }
 }

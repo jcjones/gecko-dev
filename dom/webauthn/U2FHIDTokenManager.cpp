@@ -9,11 +9,17 @@
 namespace mozilla {
 namespace dom {
 
+namespace {
+static mozilla::LazyLogModule gU2FHIDLog("u2fhidtoken");
+}
+
 static U2FHIDTokenManager* gInstance;
 static nsIThread* gPBackgroundThread;
 
 static void u2f_register_callback(uint64_t aTransactionId,
                                   rust_u2f_res* aResult) {
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("u2f_register_callback"));
+
   MOZ_ASSERT(gPBackgroundThread);
   if (!gInstance) {
     return;
@@ -29,6 +35,8 @@ static void u2f_register_callback(uint64_t aTransactionId,
 }
 
 static void u2f_sign_callback(uint64_t aTransactionId, rust_u2f_res* aResult) {
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("u2f_sign_callback"));
+
   MOZ_ASSERT(gPBackgroundThread);
 
   if (!gInstance) {
@@ -93,9 +101,13 @@ U2FHIDTokenManager::Register(const nsTArray<WebAuthnScopedCredentialDescriptor>&
                              const nsTArray<uint8_t>& aChallenge,
                              uint32_t aTimeoutMS)
 {
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("U2FHIDTokenManager::Register"));
+
   MOZ_ASSERT(NS_GetCurrentThread() == gPBackgroundThread);
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("U2FHIDTokenManager::Register2"));
 
   mRegisterPromise.RejectIfExists(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("U2FHIDTokenManager::Register3 %p %d %d", mU2FManager, aChallenge.Length(), aApplication.Length()));
 
   bool rv = rust_u2f_mgr_register(mU2FManager,
                                   ++mTransactionId,
@@ -107,8 +119,10 @@ U2FHIDTokenManager::Register(const nsTArray<WebAuthnScopedCredentialDescriptor>&
                                   aApplication.Length());
 
   if (!rv) {
+    MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("U2FHIDTokenManager::Register4 !rv"));
     return U2FRegisterPromise::CreateAndReject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
   }
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("U2FHIDTokenManager::Register5"));
 
   return mRegisterPromise.Ensure(__func__);
 }
@@ -135,6 +149,8 @@ U2FHIDTokenManager::Sign(const nsTArray<WebAuthnScopedCredentialDescriptor>& aDe
                          const nsTArray<uint8_t>& aChallenge,
                          uint32_t aTimeoutMS)
 {
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("U2FHIDTokenManager::Sign"));
+
   MOZ_ASSERT(NS_GetCurrentThread() == gPBackgroundThread);
 
   mSignPromise.RejectIfExists(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
@@ -160,6 +176,7 @@ U2FHIDTokenManager::Sign(const nsTArray<WebAuthnScopedCredentialDescriptor>& aDe
 void
 U2FHIDTokenManager::Cancel()
 {
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("U2FHIDTokenManager::Cancel"));
   MOZ_ASSERT(NS_GetCurrentThread() == gPBackgroundThread);
 
   if (mRegisterPromise.IsEmpty() && mSignPromise.IsEmpty()) {
@@ -176,6 +193,7 @@ U2FHIDTokenManager::Cancel()
 void
 U2FHIDTokenManager::HandleRegisterResult(UniquePtr<U2FResult>&& aResult)
 {
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("U2FHIDTokenManager::HandleRegisterResult"));
   MOZ_ASSERT(NS_GetCurrentThread() == gPBackgroundThread);
 
   if (aResult->GetTransactionId() != mTransactionId) {
@@ -195,6 +213,7 @@ U2FHIDTokenManager::HandleRegisterResult(UniquePtr<U2FResult>&& aResult)
 void
 U2FHIDTokenManager::HandleSignResult(UniquePtr<U2FResult>&& aResult)
 {
+  MOZ_LOG(gU2FHIDLog, LogLevel::Debug, ("U2FHIDTokenManager::HandleSignResult"));
   MOZ_ASSERT(NS_GetCurrentThread() == gPBackgroundThread);
 
   if (aResult->GetTransactionId() != mTransactionId) {
